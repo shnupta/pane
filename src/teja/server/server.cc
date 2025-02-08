@@ -1,6 +1,9 @@
 #include "server.h"
+#include "../expect.h"
 
+#include <algorithm>
 #include <cstdlib>
+#include <fstream>
 #include <quill/Backend.h>
 #include <quill/Frontend.h>
 #include <quill/sinks/FileSink.h>
@@ -55,6 +58,7 @@ server::server()
 
 	remove_pid_file();
 	destroy_socket();
+	create_pid_file();
 	create_socket();
 	spin();
 }
@@ -65,6 +69,22 @@ server::~server()
 	destroy_socket();
 	remove_pid_file();
 	quill::Backend::stop();
+}
+
+void server::client_disconnected(client_connection* conn)
+{
+	auto it = std::find_if(_client_conns.begin(), _client_conns.end(), [conn](const auto& c) {
+			return c.get() == conn;
+			});
+
+	_client_conns.erase(it);
+}
+
+void server::create_pid_file()
+{
+	EXPECT(!std::filesystem::exists(PID_FILE), "teja server pid file already exists");
+	std::ofstream os(PID_FILE);
+	os << getpid() << '\n';
 }
 
 void server::remove_pid_file()
@@ -80,19 +100,19 @@ void server::remove_pid_file()
 void server::create_socket()
 {
 	LOG_INFO(_logger, "creating socket");
-	_socket = std::make_unique<unix_socket>(unix_socket::type::stream);
+	_server_socket = std::make_unique<unix_socket::server>(unix_socket::type::stream);
 	LOG_INFO(_logger, "binding to {}", SOCKET_FILE.c_str());
-	_socket->bind(SOCKET_FILE.c_str());
-	LOG_INFO(_logger, "unix socket bound");
-	_socket->listen(&_runtime);
+	_server_socket->bind(SOCKET_FILE.c_str());
+	LOG_INFO(_logger, "unix socket bound fd={}", _server_socket->fd());
+	_server_socket->listen(&_runtime, this);
 	LOG_INFO(_logger, "socket listening");
 }
 
 void server::destroy_socket()
 {
-	if (_socket)
+	if (_server_socket)
 	{
-		_socket.reset();
+		_server_socket.reset();
 		LOG_INFO(_logger, "socket destroyed");
 	}
 
@@ -106,6 +126,12 @@ void server::destroy_socket()
 void server::spin()
 {
 	_runtime.run();
+}
+
+void server::on_new_connection(unix_socket::server*, std::unique_ptr<unix_socket::connection> conn)
+{
+	LOG_INFO(_logger, "new client connected fd={}", conn->fd());
+	_client_conns.push_back(std::make_unique<client_connection>(this, std::move(conn)));
 }
 
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fd.h"
+
 #include <vector>
 #include <poll.h>
 
@@ -18,15 +20,18 @@ public:
 
 	runtime_result run();
 
-	void add_fd(int fd, uint8_t events);
+	void register_fd(int fd, fd_handler*, fd_events);
+	void remove_fd(int fd);
 
 private:
 	bool _stopping = false;
 	runtime_result _result = runtime_result::success;
 
 	std::vector<struct pollfd> _fds;
+	std::vector<fd_handler*> _fd_handlers;
 
 	void loop();
+	bool work_to_do() const;
 
 };
 

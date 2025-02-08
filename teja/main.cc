@@ -1,6 +1,6 @@
 #include <exception>
 #include <teja/cli.h>
-#include <teja/server.h>
+#include <teja/server/server.h>
 
 int main(int argc, char** argv)
 {
