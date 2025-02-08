@@ -23,12 +23,16 @@ public:
 	void bind(const char* address);
 	void listen();
 	socket accept();
+	int recv(char* buf, size_t buf_size);
+	int connect(const char* address);
+
 	int fd() const;
 	type type() const;
 	const char* addr() const;
+
 	bool set_non_blocking();
 
-	int recv(char* buf, size_t buf_size);
+	ssize_t send(const char* data, size_t size);
 
 private:
 	enum type _type;

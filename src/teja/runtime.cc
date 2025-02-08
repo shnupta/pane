@@ -2,13 +2,19 @@
 #include "expect.h"
 
 #include <algorithm>
+#include <chrono>
 #include <csignal>
 #include <iterator>
 #include <sys/poll.h>
+#include <thread>
 
 namespace teja {
 
+using namespace std::chrono_literals;
+
 namespace {
+
+std::chrono::microseconds g_poll_wait_time = 10ms;
 
 std::atomic<bool> stop_requested{false};
 
@@ -50,6 +56,16 @@ void runtime::register_fd(int fd, fd_handler* handler, fd_events events)
 	_fd_handlers.push_back(handler);
 }
 
+void runtime::update_fd(int fd, fd_events events)
+{
+	auto it = std::find_if(_fds.begin(), _fds.end(), [fd](const struct pollfd& pfd) {
+			return pfd.fd == fd;
+			});
+	if (it == _fds.end()) return;
+
+	it->events = static_cast<int>(events);
+}
+
 void runtime::remove_fd(int fd)
 {
 	auto it = std::find_if(_fds.begin(), _fds.end(), [fd](const struct pollfd& pfd) {
@@ -74,7 +90,17 @@ void runtime::loop()
 			break;
 		}
 
+		auto now = std::chrono::steady_clock::now();
+		bool should_poll = now > (_next_poll_time + g_poll_wait_time);
+
+		if (!should_poll)
+		{
+			std::this_thread::sleep_for(g_poll_wait_time);
+		}
+		now = std::chrono::steady_clock::now();
+
 		int poll_res = ::poll(_fds.data(), _fds.size(), 0);
+		_next_poll_time = now + g_poll_wait_time;
 		if (poll_res < 0)
 		{
 			if (errno == EINTR)

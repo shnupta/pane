@@ -1,18 +1,24 @@
-#include <exception>
-#include <teja/cli.h>
-#include <teja/server/server.h>
+#include "commands.h"
+#include <teja/cli/cli.h>
 
 int main(int argc, char** argv)
 {
 	teja::cli cli;
+	cli.parse(argc, argv);
 
-	try
+	switch (cli.subcommand())
 	{
-		teja::server server;
-	}
-	catch (const std::exception& e)
-	{
-		printf("uncaught exception: %s", e.what());
+		using sc = teja::subcommand;
+
+		case sc::none:
+			spawn_or_attach();
+			break;
+		case sc::kill_server:
+			kill_server();
+			break;
+		case sc::server:
+			server_foreground();
+			break;
 	}
 
 	return 0;

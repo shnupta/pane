@@ -2,6 +2,7 @@
 
 #include "fd.h"
 
+#include <chrono>
 #include <vector>
 #include <poll.h>
 
@@ -14,6 +15,7 @@ enum class runtime_result
 };
 
 // event loop.
+// todo: make this friendlier to the cpu :)
 class runtime
 {
 public:
@@ -21,11 +23,13 @@ public:
 	runtime_result run();
 
 	void register_fd(int fd, fd_handler*, fd_events);
+	void update_fd(int fd, fd_events);
 	void remove_fd(int fd);
 
 private:
 	bool _stopping = false;
 	runtime_result _result = runtime_result::success;
+	std::chrono::steady_clock::time_point _next_poll_time{};
 
 	std::vector<struct pollfd> _fds;
 	std::vector<fd_handler*> _fd_handlers;

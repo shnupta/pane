@@ -50,7 +50,7 @@ void socket::bind(const char* address)
 {
 	struct sockaddr_un sa{0};
 	sa.sun_family = AF_UNIX;
-	strncpy(sa.sun_path, address, strlen(address));
+	strncpy(sa.sun_path, address, sizeof(sa.sun_path) - 1);
 
 	int res = ::bind(_fd, reinterpret_cast<struct sockaddr*>(&sa), sizeof(struct sockaddr_un));
 	EXPECT(res != -1, "unix socket failed to bind");
@@ -94,7 +94,21 @@ bool socket::set_non_blocking()
 {
 	int flags = fcntl(_fd, F_GETFL, 0);
 	if (flags == -1) return false;
-	return fcntl(_fd, F_SETFL, flags | O_NONBLOCK);
+	return fcntl(_fd, F_SETFL, flags | O_NONBLOCK) != -1;
+}
+
+int socket::connect(const char* address)
+{
+	struct sockaddr_un server_addr{};
+	server_addr.sun_family = AF_UNIX;
+	strncpy(server_addr.sun_path, address, sizeof(server_addr.sun_path) - 1);
+
+	return ::connect(_fd, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr));
+}
+
+ssize_t socket::send(const char* data, size_t size)
+{
+	return ::send(_fd, data, size, 0);
 }
 
 }

@@ -34,7 +34,7 @@ int server::fd() const
 void server::bind(const char* address)
 {
 	_socket.bind(address);
-	_socket.set_non_blocking();
+	EXPECT(_socket.set_non_blocking(), "non blocking failed");
 }
 
 void server::listen(runtime* r, handler* handler)
