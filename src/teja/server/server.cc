@@ -3,10 +3,11 @@
 #include "../expect.h"
 #include "../paths.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <csignal>
 #include <fstream>
-
 #include <filesystem>
 #include <iostream>
 #include <sys/fcntl.h>
@@ -71,7 +72,7 @@ bool server::spawn()
 	}
 	catch (std::exception& e)
 	{
-		LOG_ERROR(s._logger, "server died: {}", e.what());
+		SPDLOG_ERROR("server died: {}", e.what());
 		std::cerr << "server died: " << e.what() << std::endl;
 	}
 	return true;
@@ -79,8 +80,6 @@ bool server::spawn()
 
 void server::foreground()
 {
-	configure_console_logging();
-
 	server s;
 	try
 	{
@@ -88,15 +87,14 @@ void server::foreground()
 	}
 	catch (std::exception& e)
 	{
-		LOG_ERROR(s._logger, "server died: {}", e.what());
+		SPDLOG_ERROR("server died: {}", e.what());
 		std::cerr << "server died: " << e.what() << std::endl;
 	}
 }
 
 server::server()
 {
-	_logger = create_or_get_logger("server");
-	LOG_INFO(_logger, "server spawning");
+	SPDLOG_INFO("server spawning");
 
 	remove_pid_file();
 	create_pid_file();
@@ -105,7 +103,7 @@ server::server()
 
 server::~server()
 {
-	LOG_INFO(_logger, "server shutting down");
+	SPDLOG_INFO("server shutting down");
 	remove_pid_file();
 }
 
@@ -116,6 +114,12 @@ void server::client_disconnected(client_connection* conn)
 			});
 
 	_client_conns.erase(it);
+}
+
+void server::attach_to_default_session(client_connection* conn)
+{
+	auto* session = _session_manager.get_or_create_default_session();
+	_session_manager.attach_client_to_session(conn, session);
 }
 
 void server::create_pid_file()
@@ -130,20 +134,20 @@ void server::remove_pid_file()
 	if (std::filesystem::exists(PID_FILE))
 	{
 		std::filesystem::remove(PID_FILE);
-		LOG_INFO(_logger, "pid file at {} removed", PID_FILE.c_str());
+		SPDLOG_INFO("pid file at {} removed", PID_FILE.c_str());
 	}
 
 }
 
 void server::create_socket()
 {
-	LOG_INFO(_logger, "creating socket");
+	SPDLOG_INFO("creating socket");
 	_server_socket = std::make_unique<unix_socket::server>(unix_socket::type::stream);
-	LOG_INFO(_logger, "binding to {}", SOCKET_FILE.c_str());
+	SPDLOG_INFO("binding to {}", SOCKET_FILE.c_str());
 	_server_socket->bind(SOCKET_FILE.c_str());
-	LOG_INFO(_logger, "unix socket bound fd={}", _server_socket->fd());
+	SPDLOG_INFO("unix socket bound fd={}", _server_socket->fd());
 	_server_socket->listen(&_runtime, this);
-	LOG_INFO(_logger, "socket listening");
+	SPDLOG_INFO("socket listening");
 }
 
 void server::spin()
@@ -153,7 +157,7 @@ void server::spin()
 
 void server::on_new_connection(unix_socket::server*, std::unique_ptr<unix_socket::connection> conn)
 {
-	LOG_INFO(_logger, "new client connected fd={}", conn->fd());
+	SPDLOG_INFO("new client connected fd={}", conn->fd());
 	_client_conns.push_back(std::make_unique<client_connection>(this, std::move(conn)));
 }
 

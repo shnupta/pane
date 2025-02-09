@@ -1,8 +1,7 @@
-#include "../runtime.h"
 #include "client_connection.h"
+#include "session_manager.h"
+#include "../runtime.h"
 #include "../unix_socket/server.h"
-
-#include <quill/Logger.h>
 
 namespace teja {
 
@@ -23,13 +22,13 @@ public:
 	~server();
 
 	void client_disconnected(client_connection*);
+	void attach_to_default_session(client_connection*);
 	
 private:
-	quill::Logger* _logger = nullptr;
 	runtime _runtime;
+	session_manager _session_manager{&_runtime};
 
 	std::unique_ptr<unix_socket::server> _server_socket;
-
 	std::vector<std::unique_ptr<client_connection>> _client_conns;
 
 	server();

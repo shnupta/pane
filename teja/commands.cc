@@ -11,6 +11,7 @@ void spawn_or_attach()
 		if (teja::server::spawn()) return;
 	}
 
+	// todo: spin and timeout whilst attach fails??
 	teja::client::attach();
 }
 

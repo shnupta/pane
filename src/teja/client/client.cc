@@ -20,15 +20,18 @@ void client::run()
 	_runtime.run();
 }
 
+void client::send_message(proto::Message type, capnp::MessageBuilder& builder)
+{
+	auto flat_array = capnp::messageToFlatArray(builder);
+	_connection.send_message(static_cast<int>(type), flat_array.asChars().begin(), flat_array.asChars().size());
+}
+
 void client::on_connected()
 {
 	capnp::MallocMessageBuilder message;
 	proto::Hello::Builder hello = message.initRoot<proto::Hello>();
 	hello.setClientVersion(proto::CURRENT_VERSION);
-
-	auto flat_array = capnp::messageToFlatArray(message);
-
-	_connection.send_message(static_cast<int>(proto::Message::HELLO), flat_array.asChars().begin(), flat_array.asChars().size());
+	send_message(proto::Message::HELLO, message);
 }
 
 void client::on_disconnected()
@@ -47,6 +50,7 @@ void client::on_message(int type, const char* data, size_t size)
 		case proto::Message::HELLO_RESPONSE:
 			handle(reader.getRoot<proto::HelloResponse>());
 			break;
+
 		case proto::Message::HELLO:
 			// unexpected
 		default:
@@ -64,7 +68,14 @@ void client::handle(proto::HelloResponse::Reader reader)
 		return;
 	}
 
+	send_attach_request();
+}
 
+void client::send_attach_request()
+{
+	capnp::MallocMessageBuilder message;
+	proto::AttachRequest::Builder attach_request = message.initRoot<proto::AttachRequest>();
+	send_message(proto::Message::ATTACH_REQUEST, message);
 }
 
 }

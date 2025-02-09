@@ -3,6 +3,7 @@
 #include "../expect.h"
 #include "logging.h"
 
+#include "spdlog/spdlog.h"
 #include "src/teja/proto/teja.capnp.h"
 #include <capnp/serialize.h>
 
@@ -17,9 +18,8 @@ client_connection::client_connection(server* server, std::unique_ptr<unix_socket
 {
 	static int s_count = 0;
 	_id = ++s_count;
-	_logger = create_or_get_logger("client_connection");
 	_connection->set_handler(this);
-	LOG_INFO(_logger, "new client ({})", _id);
+	SPDLOG_INFO("new client ({})", _id);
 }
 
 void client_connection::on_connected()
@@ -29,7 +29,7 @@ void client_connection::on_connected()
 
 void client_connection::on_disconnected()
 {
-	LOG_INFO(_logger, "client {} disconnected", _id);
+	SPDLOG_INFO("client {} disconnected", _id);
 	_connection.reset();
 	_server->client_disconnected(this);
 }
@@ -45,54 +45,16 @@ void client_connection::on_message(int type, const char* data, size_t size)
 		case proto::Message::HELLO:
 			handle(reader.getRoot<proto::Hello>());
 			break;
+		case proto::Message::ATTACH_REQUEST:
+			handle(reader.getRoot<proto::AttachRequest>());
+			break;
+
 		case proto::Message::HELLO_RESPONSE:
 			// unexpected
 		default:
 			// unknown
-			LOG_ERROR(_logger, "received unknown message type {}", type);
+			SPDLOG_ERROR("received unknown message type {}", type);
 	}
-}
-
-void client_connection::setup_pty()
-{
-	int pty_parent = posix_openpt(O_RDWR | O_NOCTTY);
-	EXPECT(pty_parent != -1, "failed to open parent pty");
-	EXPECT(grantpt(pty_parent) != -1, "grantpt failed");
-	EXPECT(unlockpt(pty_parent) != -1, "unlockpt failed");
-
-	char* child_name = ptsname(pty_parent);
-	EXPECT(child_name != nullptr, "ptsname failed");
-
-	pid_t pid = fork();
-	if (pid == 0)
-	{
-		setup_child_pty(pty_parent, child_name);
-	}
-	else
-	{
-		setup_parent_pty(pty_parent);
-	}
-}
-
-void client_connection::setup_child_pty(int pty_parent, char* name)
-{
-	setsid();
-	int pty_child = open(name, O_RDWR);
-	EXPECT(pty_child != -1, "failed to open child pty");
-
-	dup2(pty_child, STDIN_FILENO);
-	dup2(pty_child, STDOUT_FILENO);
-	dup2(pty_child, STDERR_FILENO);
-
-	close(pty_child);
-	close(pty_parent);
-
-	execlp("sh", "sh", nullptr);
-}
-
-void client_connection::setup_parent_pty(int pty_parent)
-{
-
 }
 
 void client_connection::handle(proto::Hello::Reader reader)
@@ -121,7 +83,18 @@ void client_connection::handle(proto::Hello::Reader reader)
 	auto flat_array = capnp::messageToFlatArray(message);
 
 	_connection->send_message(static_cast<int>(proto::Message::HELLO_RESPONSE), flat_array.asChars().begin(), flat_array.asChars().size());
-	LOG_INFO(_logger, "sent hello response");
+	SPDLOG_INFO("sent hello response (error={})", builder.hasError());
+
+	if (builder.hasError())
+	{
+		// todo: disconnect client
+	}
+}
+
+void client_connection::handle(proto::AttachRequest::Reader reader)
+{
+	SPDLOG_INFO("received attach request from client {}", _id);
+	_server->attach_to_default_session(this);
 }
 
 }

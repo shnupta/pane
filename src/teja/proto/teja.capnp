@@ -6,6 +6,8 @@ $Cxx.namespace("teja::proto");
 enum Message {
 	hello @0;
 	helloResponse @1;
+	sessionList @2;
+	attachRequest @3;
 }
 
 enum ProtocolMajorVersion {
@@ -30,10 +32,21 @@ struct Hello {
 	clientVersion @0 :ProtocolVersion;
 }
 
+# on receiving an attach request the server will:
+# 1. create a new session, window, and pane if none exist.
+# 2. select a default window and send the state to the client.
+struct AttachRequest {
+
+}
+
 
 # server -> client
 
 struct HelloResponse {
 	serverVersion @0 :ProtocolVersion;
 	error @1 :Text;
+}
+
+struct SessionList {
+	# todo
 }

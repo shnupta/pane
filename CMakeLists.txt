@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(teja)
 
-add_subdirectory(quill)
+add_subdirectory(spdlog)
 find_package(CapnProto REQUIRED)
 
 set(TEJA_LIB_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
@@ -22,7 +22,7 @@ target_include_directories(tejalib PUBLIC
 	$<BUILD_INTERFACE:${TEJA_LIB_SRC_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(tejalib PUBLIC quill::quill CapnProto::capnp-rpc)
+target_link_libraries(tejalib PUBLIC spdlog::spdlog CapnProto::capnp-rpc)
 
 set(TEJA_BIN_DIR ${PROJECT_SOURCE_DIR}/teja)
 file(GLOB_RECURSE TEJA_BIN_SOURCE_FILES "${TEJA_BIN_DIR}/*.cc")

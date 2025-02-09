@@ -91,7 +91,7 @@ void runtime::loop()
 		}
 
 		auto now = std::chrono::steady_clock::now();
-		bool should_poll = now > (_next_poll_time + g_poll_wait_time);
+		bool should_poll = now > _next_poll_time;
 
 		if (!should_poll)
 		{
