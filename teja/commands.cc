@@ -39,3 +39,14 @@ void server_foreground()
 
 	teja::server::foreground();
 }
+
+void list_sessions()
+{
+	if (!teja::server::is_running())
+	{
+		printf("server is not running\n");
+		return;
+	}
+
+	teja::client::perform_action(teja::client::action::list_sessions);
+}

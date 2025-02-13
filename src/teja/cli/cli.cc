@@ -13,6 +13,9 @@ constexpr const char* k_kill_server_description = "kill the running server";
 constexpr const char* k_server_cmd = "server";
 constexpr const char* k_server_description = "run the server in the foreground";
 
+constexpr const char* k_list_sessions_command = "list-sessions";
+constexpr const char* k_list_sessions_description = "list all sessions on the running server";
+
 }
 
 cli::cli()
@@ -30,8 +33,12 @@ void cli::setup_args()
 	auto& server_cmd = add_subparser(k_server_cmd);
 	server_cmd.add_description(k_server_description);
 
+	auto& list_sessions_cmd = add_subparser(k_list_sessions_command);
+	list_sessions_cmd.add_description(k_list_sessions_description);
+
 	_parser.add_subparser(kill_server_cmd);
 	_parser.add_subparser(server_cmd);
+	_parser.add_subparser(list_sessions_cmd);
 }
 
 argparse::ArgumentParser& cli::add_subparser(std::string name)
@@ -51,6 +58,9 @@ subcommand cli::subcommand()
 
 	if (_parser.is_subcommand_used(k_server_cmd))
 		return subcommand::server;
+
+	if (_parser.is_subcommand_used(k_list_sessions_command))
+		return subcommand::list_sessions;
 
 	return subcommand::none;
 }

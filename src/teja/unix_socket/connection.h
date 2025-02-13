@@ -48,9 +48,9 @@ private:
 	streambuf _write_buf;
 	streambuf _read_buf;
 
-	void on_fd_readable() override;
-	void on_fd_writable() override;
-	void on_fd_error() override;
+	void on_fd_readable(int) override;
+	void on_fd_writable(int) override;
+	void on_fd_error(int) override;
 
 	void do_write();
 };

@@ -113,13 +113,8 @@ void server::client_disconnected(client_connection* conn)
 			return c.get() == conn;
 			});
 
+	_session_manager.client_disconnected(conn);
 	_client_conns.erase(it);
-}
-
-void server::attach_to_default_session(client_connection* conn)
-{
-	auto* session = _session_manager.get_or_create_default_session();
-	_session_manager.attach_client_to_session(conn, session);
 }
 
 void server::create_pid_file()
@@ -158,7 +153,7 @@ void server::spin()
 void server::on_new_connection(unix_socket::server*, std::unique_ptr<unix_socket::connection> conn)
 {
 	SPDLOG_INFO("new client connected fd={}", conn->fd());
-	_client_conns.push_back(std::make_unique<client_connection>(this, std::move(conn)));
+	_client_conns.push_back(std::make_unique<client_connection>(this, &_session_manager, std::move(conn)));
 }
 
 }

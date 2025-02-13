@@ -49,6 +49,11 @@ runtime_result runtime::run()
 	return _result;
 }
 
+void runtime::stop()
+{
+	_stopping = true;
+}
+
 void runtime::register_fd(int fd, fd_handler* handler, fd_events events)
 {
 	struct pollfd pfd{fd, static_cast<uint8_t>(events), 0};
@@ -119,17 +124,17 @@ void runtime::loop()
 			auto* handler = fd_handlers.at(i);
 			if (fd.revents & POLLIN)
 			{
-				handler->on_fd_readable();
+				handler->on_fd_readable(fd.fd);
 			}
 			
 			if (fd.revents & POLLOUT)
 			{
-				handler->on_fd_writable();
+				handler->on_fd_writable(fd.fd);
 			}
 
 			if (fd.revents & POLLERR)
 			{
-				handler->on_fd_error();
+				handler->on_fd_error(fd.fd);
 			}
 		}
 	}

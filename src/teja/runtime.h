@@ -21,6 +21,7 @@ class runtime
 public:
 
 	runtime_result run();
+	void stop();
 
 	void register_fd(int fd, fd_handler*, fd_events);
 	void update_fd(int fd, fd_events);

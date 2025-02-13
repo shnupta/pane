@@ -19,6 +19,9 @@ int main(int argc, char** argv)
 		case sc::server:
 			server_foreground();
 			break;
+		case sc::list_sessions:
+			list_sessions();
+			break;
 	}
 
 	return 0;

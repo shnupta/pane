@@ -50,7 +50,7 @@ void server::set_handler(handler* handler)
 	_handler = handler;
 }
 
-void server::on_fd_readable()
+void server::on_fd_readable(int)
 {
 	if (_handler)
 	{
@@ -65,11 +65,11 @@ void server::on_fd_readable()
 	}
 }
 
-void server::on_fd_writable()
+void server::on_fd_writable(int)
 {
 }
 
-void server::on_fd_error()
+void server::on_fd_error(int)
 {
 
 }

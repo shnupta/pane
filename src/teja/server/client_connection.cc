@@ -1,5 +1,7 @@
 #include "client_connection.h"
 #include "server.h"
+#include "pane.h"
+#include "session_manager.h"
 #include "../expect.h"
 #include "logging.h"
 
@@ -13,8 +15,8 @@
 
 namespace teja {
 
-client_connection::client_connection(server* server, std::unique_ptr<unix_socket::connection> conn)
-	: _server(server), _connection(std::move(conn))
+client_connection::client_connection(server* server, session_manager* sm, std::unique_ptr<unix_socket::connection> conn)
+	: _server(server), _session_manager(sm), _connection(std::move(conn))
 {
 	static int s_count = 0;
 	_id = ++s_count;
@@ -48,6 +50,9 @@ void client_connection::on_message(int type, const char* data, size_t size)
 		case proto::Message::ATTACH_REQUEST:
 			handle(reader.getRoot<proto::AttachRequest>());
 			break;
+		case proto::Message::CLIENT_TERMINAL_INPUT:
+			handle(reader.getRoot<proto::ClientTerminalInput>());
+			break;
 
 		case proto::Message::HELLO_RESPONSE:
 			// unexpected
@@ -80,21 +85,79 @@ void client_connection::handle(proto::Hello::Reader reader)
 		builder.setError("client minor version too new");
 	}
 
-	auto flat_array = capnp::messageToFlatArray(message);
-
-	_connection->send_message(static_cast<int>(proto::Message::HELLO_RESPONSE), flat_array.asChars().begin(), flat_array.asChars().size());
+	send_message(proto::Message::HELLO_RESPONSE, message);
 	SPDLOG_INFO("sent hello response (error={})", builder.hasError());
 
 	if (builder.hasError())
 	{
 		// todo: disconnect client
+		return;
 	}
+
+	send_session_list();
 }
 
 void client_connection::handle(proto::AttachRequest::Reader reader)
 {
 	SPDLOG_INFO("received attach request from client {}", _id);
-	_server->attach_to_default_session(this);
+	auto* session = _session_manager->get_or_create_default_session();
+	_session_manager->attach_client_to_session(this, session);
+}
+
+void client_connection::handle(proto::ClientTerminalInput::Reader reader)
+{
+	auto readerPane = reader.getPane();
+	auto* pane = _session_manager->try_get_pane(readerPane.getSessionId(), readerPane.getWindowId(), readerPane.getPaneId());
+
+	if (!pane) return;
+
+	pane->consume_input(reader.getInput().asChars().begin(), reader.getInput().asChars().size());
+}
+
+void client_connection::send_session_list()
+{
+	capnp::MallocMessageBuilder message;
+	auto builder = message.initRoot<proto::SessionList>();
+	const auto& sessions = _session_manager->get_sessions();
+
+	auto sessionsList = builder.initSessions(sessions.size());
+	for (size_t sIdx = 0; sIdx < sessions.size(); ++sIdx)
+	{
+		const auto& session = sessions.at(sIdx);
+		auto sessionDetails = sessionsList[sIdx];
+		sessionDetails.setId(session->id());
+		sessionDetails.setName(session->name());
+
+		const auto& windows = session->windows();
+		auto windowsList = sessionDetails.initWindows(windows.size());
+		for (size_t wIdx = 0; wIdx < windows.size(); ++wIdx)
+		{
+			const auto& window = windows.at(wIdx);
+			auto windowDetails = windowsList[wIdx];
+			windowDetails.setId(window.id());
+			windowDetails.setName(window.name());
+
+			const auto& panes = window.panes();
+			auto panesList = windowDetails.initPanes(panes.size());
+			for (size_t pIdx = 0; pIdx < panes.size(); ++pIdx)
+			{
+				const auto& pane = panes.at(pIdx);
+				auto paneDetails = panesList[pIdx];
+
+				paneDetails.setId(pane.id());
+				paneDetails.setName(pane.name());
+			}
+		}
+	}
+
+	send_message(proto::Message::SESSION_LIST, message);
+	SPDLOG_INFO("sent session list to client {}", _id);
+}
+
+void client_connection::send_message(proto::Message type, capnp::MessageBuilder& builder)
+{
+	auto data = capnp::messageToFlatArray(builder);
+	_connection->send_message(static_cast<int>(type), data.asChars().begin(), data.asChars().size());
 }
 
 }

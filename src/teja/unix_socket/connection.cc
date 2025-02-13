@@ -70,7 +70,7 @@ void connection::set_handler(handler* handler)
 	_handler = handler;
 }
 
-void connection::on_fd_readable() 
+void connection::on_fd_readable(int) 
 {
 	constexpr size_t k_read_size = 65'536;
 	auto* buf = _read_buf.prepare_source(k_read_size);
@@ -107,7 +107,7 @@ void connection::on_fd_readable()
 	}
 }
 
-void connection::on_fd_writable()
+void connection::on_fd_writable(int)
 {
 	switch (_state)
 	{
@@ -122,9 +122,9 @@ void connection::on_fd_writable()
 	}
 }
 
-void connection::on_fd_error() 
+void connection::on_fd_error(int) 
 {
-
+	// TODO
 }
 
 void connection::send_message(int type, const char *data, size_t size)

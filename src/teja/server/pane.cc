@@ -1,15 +1,17 @@
 #include "pane.h"
+#include "window.h"
 #include "../expect.h"
 #include "spdlog/spdlog.h"
 
 #include <cstdlib>
+#include <string>
 #include <sys/fcntl.h>
 #include <unistd.h>
 
 namespace teja {
 
-pane::pane(runtime* r)
-	: _runtime(r)
+pane::pane(runtime* r, window* window, size_t id)
+	: _runtime(r), _window(window), _id(id), _name(std::to_string(id))
 {
 	_pty_parent = posix_openpt(O_RDWR | O_NOCTTY);
 	EXPECT(_pty_parent != -1, "failed to open parent pty");
@@ -56,24 +58,34 @@ void pane::setup_parent_pty()
 	_runtime->register_fd(_pty_parent, this, fd_events::read);
 }
 
-void pane::on_fd_readable()
+void pane::on_fd_readable(int)
 {
 	SPDLOG_INFO("pty {} readable", _pty_parent);
-	char buf[1024];
+	char buf[1 << 16];
 	int res = ::read(_pty_parent, buf, sizeof(buf));
 
 	EXPECT(res > 0, "read failed");
-	SPDLOG_INFO("read from master pty: {}", buf);
+	broadcast_terminal_output(buf, res);
 }
 
-void pane::on_fd_writable()
+void pane::broadcast_terminal_output(char* data, int size)
+{
+	_window->broadcast_terminal_output(_id, data, size);
+}
+
+void pane::on_fd_writable(int)
 {
 
 }
 
-void pane::on_fd_error()
+void pane::on_fd_error(int)
 {
 
+}
+
+void pane::consume_input(const char* data, size_t size)
+{
+	::write(_pty_parent, data, size);
 }
 
 }

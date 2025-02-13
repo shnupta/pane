@@ -22,7 +22,6 @@ public:
 	~server();
 
 	void client_disconnected(client_connection*);
-	void attach_to_default_session(client_connection*);
 	
 private:
 	runtime _runtime;

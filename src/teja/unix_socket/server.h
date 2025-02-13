@@ -33,9 +33,9 @@ private:
 	runtime* _runtime = nullptr;
 	handler* _handler = nullptr;
 
-	void on_fd_readable() override;
-	void on_fd_writable() override;
-	void on_fd_error() override;
+	void on_fd_readable(int) override;
+	void on_fd_writable(int) override;
+	void on_fd_error(int) override;
 };
 
 }

@@ -9,7 +9,8 @@ enum class subcommand
 {
 	none,
 	kill_server,
-	server
+	server,
+	list_sessions
 };
 
 class cli
