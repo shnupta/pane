@@ -2,7 +2,6 @@
 #include "../paths.h"
 
 #include "src/pane/proto/pane.capnp.h"
-#include "pane/expect.h"
 
 #include <capnp/serialize.h>
 #include <cstring>
@@ -10,6 +9,8 @@
 #include <unistd.h>
 
 namespace pane {
+
+using namespace std::chrono_literals;
 
 void client::attach()
 {
@@ -27,8 +28,14 @@ void client::perform_action(action a)
 void client::run()
 {
 	_connection.set_handler(this);
-	_connection.connect(SOCKET_FILE.c_str(), &_runtime);
+	connect();
 	_runtime.run();
+}
+
+void client::connect()
+{
+	_state = state::connecting;
+	_connection.connect(SOCKET_FILE.c_str(), &_runtime);
 }
 
 client::~client()
@@ -39,6 +46,11 @@ client::~client()
 void client::push_action(action a)
 {
 	_actions.push_back(a);
+}
+
+void client::detach()
+{
+	_runtime.stop();
 }
 
 auto client::next_action() const -> std::optional<action>
@@ -64,6 +76,7 @@ void client::send_message(proto::Message type, capnp::MessageBuilder& builder)
 
 void client::on_connected()
 {
+	_state = state::connected;
 	capnp::MallocMessageBuilder message;
 	proto::Hello::Builder hello = message.initRoot<proto::Hello>();
 	hello.setClientVersion(proto::CURRENT_VERSION);
@@ -72,7 +85,26 @@ void client::on_connected()
 
 void client::on_disconnected()
 {
+	if (_state == state::connected)
+	{
+		_runtime.stop();
+		return;
+	}
 
+	if (_state == state::connecting)
+	{
+		std::cerr << "connect failed" << std::endl;
+		// add callback to reconnect
+		_failed_connect_attempts++;
+		if (_failed_connect_attempts > 10)
+		{
+			std::cerr << "failed to connect to server, is it running?" << std::endl;
+			_runtime.stop();
+			return;
+		}
+		
+		_runtime.post_callback(1ms, [&] { connect(); });
+	}
 }
 
 void client::on_message(int type, const char* data, size_t size)
@@ -108,8 +140,8 @@ void client::handle(proto::HelloResponse::Reader reader)
 {
 	if (reader.hasError())
 	{
-		printf("cannot connect to server: %s", reader.getError().cStr());
-		// todo: destroy connection
+		std::cerr << "hello failed: " << reader.getError().cStr() << std::endl;
+		_runtime.stop();
 		return;
 	}
 }
@@ -143,7 +175,7 @@ void client::handle(proto::AttachResponse::Reader reader)
 {
 	if (reader.hasError())
 	{
-		// TODO
+		std::cerr << "attach failed: " << reader.getError().cStr() << std::endl;
 		return;
 	}
 
@@ -153,6 +185,7 @@ void client::handle(proto::AttachResponse::Reader reader)
 	_active_session = reader.getPane().getSessionId();
 	_active_window = reader.getPane().getWindowId();
 	_active_pane = reader.getPane().getPaneId();
+	_mode = mode::raw;
 }
 
 void client::handle(proto::PaneTerminalContent::Reader reader)
@@ -167,26 +200,72 @@ void client::on_fd_writable(int)
 
 }
 
+void client::handle_raw_input(const char* buf, int len)
+{
+	static constexpr char k_prefix = 0x02; // Ctrl-b
+	// todo: process prefix, else write to stdout
+
+	if (buf[0] == k_prefix)
+	{
+		_mode = mode::prefix;
+		return;
+	}
+
+	capnp::MallocMessageBuilder message;
+	auto builder = message.initRoot<proto::ClientTerminalInput>();
+
+	auto pane = builder.initPane();
+	pane.setSessionId(_active_session);
+	pane.setWindowId(_active_window);
+	pane.setPaneId(_active_pane);
+
+	auto input = builder.initInput(len);
+	std::memcpy(input.begin(), buf, len);
+
+	send_message(proto::Message::CLIENT_TERMINAL_INPUT, message);
+}
+
+void client::handle_prefix_input(const char* buf, int len)
+{
+	switch (buf[0])
+	{
+		case 'd':
+			detach();
+			break;
+	}
+
+	_mode = mode::raw;
+}
+
+void client::handle_command_input(const char* buf, int len)
+{
+
+}
+
 void client::on_fd_readable(int)
 {
-	char buf[1 << 16];
+	// can decide if one char at a time is fine or if overhead is too bad
+	char buf[1]; // todo: one only is okay?
 	// stuff was written to the terminal
 	int res = ::read(STDIN_FILENO, buf, sizeof(buf));
 	if (res > 0)
 	{
-		// TODO: check the input for special characters (prefix + something)
-		capnp::MallocMessageBuilder message;
-		auto builder = message.initRoot<proto::ClientTerminalInput>();
-
-		auto pane = builder.initPane();
-		pane.setSessionId(_active_session);
-		pane.setWindowId(_active_window);
-		pane.setPaneId(_active_pane);
-
-		auto input = builder.initInput(res);
-		std::memcpy(input.begin(), buf, res);
-
-		send_message(proto::Message::CLIENT_TERMINAL_INPUT, message);
+		switch (_mode)
+		{
+			case mode::raw:
+				// todo: rename to handle_x_char
+				handle_raw_input(buf, res);
+				break;
+			case mode::prefix:
+				handle_prefix_input(buf, res);
+				break;
+			case mode::command:
+				handle_command_input(buf, res);
+				break;
+			case mode::none:
+				// ignore
+				break;
+		};
 	}
 }
 

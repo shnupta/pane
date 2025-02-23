@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(pane)
 
 add_subdirectory(spdlog)
+add_subdirectory(wonky)
 find_package(CapnProto REQUIRED)
 
 set(PANE_LIB_SRC_DIR ${PROJECT_SOURCE_DIR}/src)
@@ -22,7 +23,7 @@ target_include_directories(panelib PUBLIC
 	$<BUILD_INTERFACE:${PANE_LIB_SRC_DIR}>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(panelib PUBLIC spdlog::spdlog CapnProto::capnp-rpc)
+target_link_libraries(panelib PUBLIC spdlog::spdlog CapnProto::capnp-rpc wonky::wonky)
 
 set(PANE_BIN_DIR ${PROJECT_SOURCE_DIR}/pane)
 file(GLOB_RECURSE PANE_BIN_SOURCE_FILES "${PANE_BIN_DIR}/*.cc")

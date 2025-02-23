@@ -19,7 +19,6 @@ constexpr const char* k_list_sessions_description = "list all sessions on the ru
 }
 
 cli::cli()
-	// todo: default arguments is to spawn a new server
 	: _parser(g_program_name, g_version)
 {
 	setup_args();

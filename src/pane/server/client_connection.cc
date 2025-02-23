@@ -144,8 +144,8 @@ void client_connection::send_session_list()
 				const auto& pane = panes.at(pIdx);
 				auto paneDetails = panesList[pIdx];
 
-				paneDetails.setId(pane.id());
-				paneDetails.setName(pane.name());
+				paneDetails.setId(pane->id());
+				paneDetails.setName(pane->name());
 			}
 		}
 	}

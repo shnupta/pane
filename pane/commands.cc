@@ -11,7 +11,6 @@ void spawn_or_attach()
 		if (pane::server::spawn()) return;
 	}
 
-	// todo: spin and timeout whilst attach fails??
 	pane::client::attach();
 }
 

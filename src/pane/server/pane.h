@@ -19,6 +19,7 @@ class pane final : public fd_handler
 public:
 	explicit pane(runtime* r, window* w, size_t id);
 	~pane();
+	pane(pane&&) = delete;
 
 	size_t id() const { return _id; }
 	const std::string& name() const { return _name; }

@@ -15,7 +15,6 @@ class pane;
 class client_connection : public unix_socket::connection::handler 
 {
 public:
-	// todo: pass session_manager here so client can interact
 	explicit client_connection(server* server, session_manager*, std::unique_ptr<unix_socket::connection>);
 
 	size_t id() const { return _id; };

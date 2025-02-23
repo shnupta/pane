@@ -1,6 +1,9 @@
 #include "session.h"
 #include "client_connection.h"
+#include "session_manager.h"
 
+#include "pane/expect.h"
+#include "spdlog/spdlog.h"
 #include "src/pane/proto/pane.capnp.h"
 
 #include <capnp/message.h>
@@ -12,8 +15,8 @@
 
 namespace pane {
 
-session::session(runtime* r, size_t id)
-	: _runtime(r), _id(id), _name(std::to_string(id))
+session::session(runtime* r, session_manager* sm, size_t id)
+	: _runtime(r), _session_manager(sm), _id(id), _name(std::to_string(id))
 {
 	_windows.emplace_back(_runtime, this, _next_window_id);
 	_active_window_idx = 0;
@@ -56,6 +59,24 @@ pane* session::try_get_pane(size_t window_id, size_t pane_id)
 	if (it == _windows.end()) return nullptr;
 
 	return it->try_get_pane(pane_id);
+}
+
+void session::cleanup_window(size_t window_id)
+{
+	auto it = std::find_if(_windows.begin(), _windows.end(), [=](const auto& o) { return o.id() == window_id; });
+	EXPECT(it != _windows.end(), "could not find window to cleanup");
+
+	_windows.erase(it);
+
+	if (_windows.empty())
+	{
+		SPDLOG_INFO("window {} closed", window_id);
+		_session_manager->cleanup_session(this);
+	}
+	else
+	{
+		// attach client to next window
+	}
 }
 
 }

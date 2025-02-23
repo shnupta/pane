@@ -28,9 +28,27 @@ session* session_manager::get_or_create_default_session()
 session* session_manager::create_session()
 {
 	SPDLOG_INFO("creating new session {}", _next_session_id);
-	auto& s = _sessions.emplace_back(std::make_unique<session>(_runtime, _next_session_id));
+	auto& s = _sessions.emplace_back(std::make_unique<session>(_runtime, this, _next_session_id));
 	++_next_session_id;
 	return s.get();
+}
+
+void session_manager::cleanup_session(session* s)
+{
+	auto it = std::find_if(_sessions.begin(), _sessions.end(), [=](const auto& other) { return other.get() == s; });
+	EXPECT(it != _sessions.end(), "could not find session to cleanup");
+
+	_sessions.erase(it);
+
+	if (_sessions.empty())
+	{
+		SPDLOG_INFO("last session closed, stopping server");
+		_runtime->stop();
+	}
+	else
+	{
+		// todo: move client to next session
+	}
 }
 
 void session_manager::attach_client_to_session(client_connection* conn, session* s)
@@ -51,7 +69,7 @@ void session_manager::send_attach_response(client_connection* conn, session* s)
 
 	auto pane = builder.initPane();
 	pane.setSessionId(s->id());
-	auto window = s->active_window();
+	auto& window = s->active_window();
 	pane.setWindowId(window.id());
 	pane.setPaneId(0); // TODO: better :)
 

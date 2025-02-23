@@ -8,11 +8,12 @@
 namespace pane {
 
 class client_connection;
+class session_manager;
 
 class session
 {
 public:
-	explicit session(runtime* r, size_t id);
+	explicit session(runtime* r, session_manager* sm, size_t id);
 
 	size_t id() const { return _id; }
 	const std::string& name() const { return _name; }
@@ -24,9 +25,11 @@ public:
 
 	pane* try_get_pane(size_t window_id, size_t pane_id);
 	void broadcast_terminal_output(size_t window_id, size_t pane_id, char* data, int size);
+	void cleanup_window(size_t window_id);
 
 private:
 	runtime* _runtime = nullptr;
+	session_manager* _session_manager = nullptr;
 	size_t _id;
 	std::string _name;
 

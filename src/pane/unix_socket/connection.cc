@@ -2,6 +2,7 @@
 #include "../runtime.h"
 #include "../expect.h"
 #include <cstring>
+#include <sys/socket.h>
 #include <unistd.h>
 
 namespace pane::unix_socket {
@@ -46,7 +47,8 @@ void connection::connect(const char* addr, runtime* runtime)
 	int res = _socket.connect(addr);
 	if (res < 0)
 	{
-		EXPECT(res == EINPROGRESS || res == EWOULDBLOCK, "connect failed");
+		_state = state::disconnected;
+		_handler->on_disconnected();
 	}
 	if (res == 0 && _handler)
 	{
@@ -81,6 +83,7 @@ void connection::on_fd_readable(int)
 		{
 			// expect to be destroyed here
 			_handler->on_disconnected();
+			_state = state::disconnected;
 			return;
 		}
 	}
@@ -117,7 +120,16 @@ void connection::on_fd_writable(int)
 			do_write();
 			break;
 		case state::connecting:
-			// check connect result
+			int err;
+			socklen_t len = sizeof(err);
+			if (getsockopt(_socket.fd(), SOL_SOCKET, SO_ERROR, &err, &len) < 0 || err != 0)
+			{
+				_handler->on_disconnected();
+			}
+			else
+			{
+				_handler->on_connected();
+			}
 			break;
 	}
 }

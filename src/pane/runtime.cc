@@ -85,6 +85,24 @@ void runtime::remove_fd(int fd)
 	_fd_handlers.erase(handler_it);
 }
 
+void runtime::post_callback(callback cb)
+{
+	post_callback(0ns, cb);
+}
+
+void runtime::post_callback(std::chrono::nanoseconds in, callback cb)
+{
+	auto fire_at = std::chrono::steady_clock::now() + in;
+	auto it = std::lower_bound(_post_callbacks.begin(), _post_callbacks.end(), fire_at, [&](const auto& cba, const auto& fire_at)
+			{
+			  return cba.fire_at < fire_at;
+			});
+	_post_callbacks.insert(it, callback_info{
+			.fire_at = fire_at,
+			.cb = cb
+			});
+}
+
 void runtime::loop()
 {
 	while (!_stopping && !stop_requested)
@@ -113,36 +131,54 @@ void runtime::loop()
 			EXPECT(false, "poll failed");
 		}
 
-		if (poll_res == 0) continue;
-
-		// copy in case fds are added or removed during iteration
-		auto fds = _fds;
-		auto fd_handlers = _fd_handlers;
-		for (auto i = 0; i < fds.size(); ++i)
+		if (poll_res > 0)
 		{
-			auto fd = fds.at(i);
-			auto* handler = fd_handlers.at(i);
-			if (fd.revents & POLLIN)
+			// copy in case fds are added or removed during iteration
+			auto fds = _fds;
+			auto fd_handlers = _fd_handlers;
+			for (auto i = 0; i < fds.size(); ++i)
 			{
-				handler->on_fd_readable(fd.fd);
-			}
-			
-			if (fd.revents & POLLOUT)
-			{
-				handler->on_fd_writable(fd.fd);
-			}
+				auto fd = fds.at(i);
+				auto* handler = fd_handlers.at(i);
+				if (fd.revents & POLLIN)
+				{
+					handler->on_fd_readable(fd.fd);
+				}
+				
+				if (fd.revents & POLLOUT)
+				{
+					handler->on_fd_writable(fd.fd);
+				}
 
-			if (fd.revents & POLLERR)
-			{
-				handler->on_fd_error(fd.fd);
+				if (fd.revents & POLLERR)
+				{
+					handler->on_fd_error(fd.fd);
+				}
 			}
 		}
+
+		// todo: get time again??
+		if (!_post_callbacks.empty())
+		{
+			auto to_call = _post_callbacks; // in case we remove later
+			auto it = to_call.begin();
+			for (; it != to_call.end(); ++it)
+			{
+				if (it->fire_at < now)
+					break;
+
+				it->cb();
+			}
+			to_call.erase(to_call.begin(), it);
+			_post_callbacks.swap(to_call);
+		}
+
 	}
 }
 
 bool runtime::work_to_do() const
 {
-	return _fds.size() > 0;
+	return !(_fds.empty() && _post_callbacks.empty());
 }
 
 }

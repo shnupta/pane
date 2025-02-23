@@ -38,11 +38,39 @@ private:
 
 	std::deque<action> _actions;
 
+	enum class state
+	{
+		// default/initial state
+		disconnected,
+		// attempting to connect to the server
+		connecting,
+		// connected to the server and doing handshake
+		connected
+	};
+
+	enum class mode
+	{
+		// default/initial state 
+		none,
+		// attached to some session, direct input to server
+		raw,
+		// prefix sequence pressed, awaiting key specifier
+		prefix,
+		// typing some command in
+		command
+	};
+
+	state _state = state::disconnected;
+	mode _mode = mode::none;
+	size_t _failed_connect_attempts = 0;
+
 	// future: instead of just run maybe do separate method calls so that the 
 	// cli is flexible. so attach still exists and just goes default session.
 	// but other args might list-sessions or attach to a particular session.
 	void run();
 	void push_action(action a);
+
+	void connect();
 
 	std::optional<action> next_action() const;
 	action pop_action();
@@ -57,13 +85,21 @@ private:
 	void on_fd_readable(int) override;
 	void on_fd_error(int) override;
 
+	// server messages
 	void handle(proto::HelloResponse::Reader);
 	void handle(proto::SessionList::Reader);
 	void handle(proto::AttachResponse::Reader);
 	void handle(proto::PaneTerminalContent::Reader);
 
+	// terminal input
+	void handle_raw_input(const char* buf, int len);
+	void handle_prefix_input(const char* buf, int len);
+	void handle_command_input(const char* buf, int len);
+
 	void send_window_size();
 	void send_attach_request();
+
+	void detach();
 };
 
 }

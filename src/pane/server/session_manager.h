@@ -21,6 +21,8 @@ public:
 	const std::vector<std::unique_ptr<session>>& get_sessions() const;
 	pane* try_get_pane(size_t session_id, size_t window_id, size_t pane_id);
 
+	void cleanup_session(session*);
+
 private:
 	runtime* _runtime = nullptr;
 	size_t _next_session_id = 0;

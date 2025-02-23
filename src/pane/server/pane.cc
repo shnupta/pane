@@ -60,11 +60,17 @@ void pane::setup_parent_pty()
 
 void pane::on_fd_readable(int)
 {
-	SPDLOG_INFO("pty {} readable", _pty_parent);
+	SPDLOG_DEBUG("pty {} readable", _pty_parent);
 	char buf[1 << 16];
 	int res = ::read(_pty_parent, buf, sizeof(buf));
 
-	EXPECT(res > 0, "read failed");
+	if (res == 0) // client killed the terminal
+	{
+		SPDLOG_INFO("client killed pty {}", _pty_parent);
+		_window->cleanup_pane(this);
+		return; // we are destroyed
+	}
+
 	broadcast_terminal_output(buf, res);
 }
 

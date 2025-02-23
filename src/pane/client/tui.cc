@@ -23,8 +23,8 @@ void tui::enable_raw_mode()
 	}
 
 	struct termios raw = _original_termios;
-	// raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN);
+	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+	// raw.c_lflag &= ~(ECHO | ICANON | IEXTEN); // ctrl-c will kill client in this case
 	raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP | IXON);
 	raw.c_oflag &= ~(OPOST);
 	raw.c_cflag |= (CS8);
